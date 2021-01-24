@@ -8,6 +8,14 @@ from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
 
+def paginate_questions(request, selection):
+  page =  request.args.get('page', 1, type=int)
+  start = (page - 1) * QUESTIONS_PER_PAGE
+  end = start + QUESTIONS_PER_PAGE
+  questions = [question.format() for question in selection]
+  current_questions = questions[start:end]
+  return current_questions
+
 def create_app(test_config=None):
   # create and configure the app
   app = Flask(__name__)
@@ -55,6 +63,30 @@ def create_app(test_config=None):
   ten questions per page and pagination at the bottom of the screen for three pages.
   Clicking on the page numbers should update the questions. 
   '''
+  @app.route('/questions')
+  @app.route('/categories/<int:cat_id>/questions')
+  def list_questions(cat_id=-1):
+    selected_category = Category.query.filter_by(id=cat_id).one_or_none()
+    categories = Category.query.order_by('id').all()
+
+    if selected_category is None:
+      questions_list = Question.query.order_by('id').all()
+      current_category = None
+    else:
+      questions_list = Question.query.filter_by(category=cat_id).order_by('id').all()
+      current_category = selected_category.format()
+
+    # Paginate the questions
+    current_questions = paginate_questions(request, questions_list)
+
+    return jsonify({
+      'success': True,
+      'questions': current_questions,
+      'total_questions': len(questions_list),
+      'categories': [category.type for category in categories],
+      'current_category': current_category,
+    })
+
 
   '''
   @TODO: 
@@ -63,6 +95,19 @@ def create_app(test_config=None):
   TEST: When you click the trash icon next to a question, the question will be removed.
   This removal will persist in the database and when you refresh the page. 
   '''
+  @app.route('/questions/<q_id>', methods=['DELETE'])
+  def delete_question(q_id):
+    question = Question.query.filter_by(id=q_id).one_or_none()
+
+    if question is None:
+      abort(404)
+
+    question.delete()
+    # print("Question # {} deleted!".format(q_id))
+    
+    return jsonify({
+      'success': True,
+    })
 
   '''
   @TODO: 
@@ -113,6 +158,13 @@ def create_app(test_config=None):
   Create error handlers for all expected errors 
   including 404 and 422. 
   '''
+  @app.errorhandler(404)
+  def not_found(error):
+    return jsonify({
+      'success': False,
+      'error': 404,
+      'message': "resource not found"
+    }), 404
   
   return app
 
