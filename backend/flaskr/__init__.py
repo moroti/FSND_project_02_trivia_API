@@ -64,18 +64,12 @@ def create_app(test_config=None):
   Clicking on the page numbers should update the questions. 
   '''
   @app.route('/questions')
-  @app.route('/categories/<int:cat_id>/questions')
-  def list_questions(cat_id=-1):
-    selected_category = Category.query.filter_by(id=cat_id).one_or_none()
-    categories = Category.query.order_by('id').all()
+  def list_questions():
+    questions_list = Question.query.order_by('id').all()
 
-    if selected_category is None:
-      questions_list = Question.query.order_by('id').all()
-      current_category = None
-    else:
-      questions_list = Question.query.filter_by(category=cat_id).order_by('id').all()
-      current_category = selected_category.format()
-
+    selection =  Category.query.order_by(Category.id).all()
+    categories = [category.type for category in selection]
+    
     # Paginate the questions
     current_questions = paginate_questions(request, questions_list)
 
@@ -83,8 +77,8 @@ def create_app(test_config=None):
       'success': True,
       'questions': current_questions,
       'total_questions': len(questions_list),
-      'categories': [category.type for category in categories],
-      'current_category': current_category,
+      'categories': categories,
+      'current_category': None,
     })
 
 
@@ -159,6 +153,28 @@ def create_app(test_config=None):
   categories in the left column will cause only questions of that 
   category to be shown. 
   '''
+  @app.route('/categories/<int:cat_id>/questions')
+  def get_questions_by_category(cat_id):
+    selected_category = Category.query.filter_by(id=cat_id).one_or_none()
+    categories = Category.query.order_by('id').all()
+
+    if selected_category is None:
+      questions_list = Question.query.order_by('id').all()
+      current_category = None
+    else:
+      questions_list = Question.query.filter_by(category=cat_id).order_by('id').all()
+      current_category = selected_category.format()
+
+    # Paginate the questions
+    current_questions = paginate_questions(request, questions_list)
+
+    return jsonify({
+      'success': True,
+      'questions': current_questions,
+      'total_questions': len(questions_list),
+      'categories': [category.type for category in categories],
+      'current_category': current_category,
+    })
 
 
   '''
