@@ -42,8 +42,8 @@ def create_app(test_config=None):
   '''
   @app.route('/categories')
   def list_categories():
-    selection =  Category.query.order_by(Category.type).all()
-    categories = [category.format() for category in selection]
+    selection =  Category.query.order_by(Category.id).all()
+    categories = [category.type for category in selection]
 
     return jsonify({
       'success': True,
@@ -103,7 +103,6 @@ def create_app(test_config=None):
       abort(404)
 
     question.delete()
-    # print("Question # {} deleted!".format(q_id))
     
     return jsonify({
       'success': True,
@@ -119,6 +118,27 @@ def create_app(test_config=None):
   the form will clear and the question will appear at the end of the last page
   of the questions list in the "List" tab.  
   '''
+  @app.route('/questions', methods=['POST'])
+  def create_question():
+    body = request.get_json()
+
+    question_text = body.get('question')
+    answer_text = body.get('answer')
+    category = body.get('category')
+    difficulty = body.get('difficulty')
+
+    try:
+      question = Question(question_text, answer_text,category, difficulty)
+      question.insert()
+
+      categories = Category.query.order_by('id').all()
+
+      return jsonify({
+        'success': True,
+        'created': question.id,
+      })
+    except:
+      abort(422)
 
   '''
   @TODO: 
