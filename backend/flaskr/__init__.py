@@ -68,17 +68,13 @@ def create_app(test_config=None):
   def list_questions():
     questions_list = Question.query.order_by('id').all()
 
-    selection =  Category.query.order_by(Category.id).all()
-    categories = [category.type for category in selection]
-    
-    # Paginate the questions
-    current_questions = paginate_questions(request, questions_list)
+    categories =  Category.query.order_by(Category.id).all()
 
     return jsonify({
       'success': True,
-      'questions': current_questions,
+      'questions': paginate_questions(request, questions_list),
       'total_questions': len(questions_list),
-      'categories': categories,
+      'categories': [category.type for category in categories],
       'current_category': None,
     })
 
@@ -116,19 +112,25 @@ def create_app(test_config=None):
   @app.route('/questions', methods=['POST'])
   def create_or_search_question():
     body = request.get_json()
-    print(body)
-    if 'searchTerm' not in body:
-      question_text = body.get('question')
-      answer_text = body.get('answer')
-      category = body.get('category')
-      difficulty = body.get('difficulty')
-    else:
-      search_term = body.get('searchTerm', '')
 
     try:
+      # If it's a request to create new question
       if 'searchTerm' not in body:
-        question = Question(question_text, answer_text,category, difficulty)
-        question.insert()
+        # Retreive the user inputs for the new question
+        question_text = body.get('question').strip()
+        answer_text = body.get('answer').strip()
+        category = body.get('category')
+        difficulty = body.get('difficulty')
+        print("category",category)
+        # Valid question must have no empty fields and have valid values
+        valid_question  = question_text and answer_text and category and category <= 6 and difficulty and difficulty <= 5
+
+        if valid_question:
+          question = Question(question_text, answer_text,category, difficulty)
+          # Add the new question
+          question.insert()
+        else:
+          abort(422)
 
         categories = Category.query.order_by('id').all()
 
@@ -137,8 +139,11 @@ def create_app(test_config=None):
           'created': question.id,
         })
       else:
+        # If instead it's a search request, retreive the input search term
+        search_term = body.get('searchTerm', '').strip()
+        # Search the questions containing the search term
         questions = Question.query.filter(Question.question.ilike('%{}%'.format(search_term))).all()
-        # Paginate the questions
+        # Paginate the questions list
         current_questions = paginate_questions(request, questions)
 
         return jsonify({
@@ -161,16 +166,7 @@ def create_app(test_config=None):
   only question that include that string within their question. 
   Try using the word "title" to start. 
   '''
-  # @app.route('/questions', methods=['POST'])
-  # def search_questions():
-  #   body = request.get_json()
-  #   search_term = body.get('search')
-  #   questions = Question.query.filter(Question.question.ilike('%{}%'.format(search_term))).all()
-  #   return jsonify({
-  #     'success': True,
-  #     'questions': questions,
-  #     'total_questions': len(questions),
-  #   })
+  # check the POST /questions endpoint
 
   '''
   @TODO: 
@@ -185,22 +181,18 @@ def create_app(test_config=None):
     selected_category = Category.query.filter_by(id=cat_id).one_or_none()
     categories = Category.query.order_by('id').all()
 
+    # If the given category does not exist, abort and raise 404 error
     if selected_category is None:
-      questions_list = Question.query.order_by('id').all()
-      current_category = None
-    else:
-      questions_list = Question.query.filter_by(category=cat_id).order_by('id').all()
-      current_category = selected_category.format()
-
-    # Paginate the questions
-    current_questions = paginate_questions(request, questions_list)
+      abort(404)
+    
+    questions_list = Question.query.filter_by(category=cat_id).order_by('id').all()
 
     return jsonify({
       'success': True,
-      'questions': current_questions,
+      'questions': paginate_questions(request, questions_list),
       'total_questions': len(questions_list),
       'categories': [category.type for category in categories],
-      'current_category': current_category,
+      'current_category': selected_category.format(),
     })
 
 
@@ -229,16 +221,15 @@ def create_app(test_config=None):
       # Get the list of the questions of the given category
       questions = questions.filter(Question.category==quiz_category['id'])
 
-    question = None
+    current_question = None
 
     # Randomly select the current question
     if len(questions.all()) > 0:
-      question = random.choice(questions.all()).format()
-
+      current_question = random.choice(questions.all()).format()
 
     return jsonify({
       'success': True,
-      'question': question
+      'question': current_question
     })
 
   '''
