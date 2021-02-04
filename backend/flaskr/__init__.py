@@ -3,6 +3,7 @@ from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
+import sys
 
 from models import setup_db, Question, Category
 
@@ -113,25 +114,41 @@ def create_app(test_config=None):
   of the questions list in the "List" tab.  
   '''
   @app.route('/questions', methods=['POST'])
-  def create_question():
+  def create_or_search_question():
     body = request.get_json()
-
-    question_text = body.get('question')
-    answer_text = body.get('answer')
-    category = body.get('category')
-    difficulty = body.get('difficulty')
+    print(body)
+    if 'searchTerm' not in body:
+      question_text = body.get('question')
+      answer_text = body.get('answer')
+      category = body.get('category')
+      difficulty = body.get('difficulty')
+    else:
+      search_term = body.get('searchTerm', '')
 
     try:
-      question = Question(question_text, answer_text,category, difficulty)
-      question.insert()
+      if 'searchTerm' not in body:
+        question = Question(question_text, answer_text,category, difficulty)
+        question.insert()
 
-      categories = Category.query.order_by('id').all()
+        categories = Category.query.order_by('id').all()
 
-      return jsonify({
-        'success': True,
-        'created': question.id,
-      })
+        return jsonify({
+          'success': True,
+          'created': question.id,
+        })
+      else:
+        questions = Question.query.filter(Question.question.ilike('%{}%'.format(search_term))).all()
+        # Paginate the questions
+        current_questions = paginate_questions(request, questions)
+
+        return jsonify({
+          'success': True,
+          'questions': current_questions,
+          'total_questions': len(questions),
+          'current_category': None,
+        })
     except:
+      # print(sys.exc_info())
       abort(422)
 
   '''
@@ -144,6 +161,16 @@ def create_app(test_config=None):
   only question that include that string within their question. 
   Try using the word "title" to start. 
   '''
+  # @app.route('/questions', methods=['POST'])
+  # def search_questions():
+  #   body = request.get_json()
+  #   search_term = body.get('search')
+  #   questions = Question.query.filter(Question.question.ilike('%{}%'.format(search_term))).all()
+  #   return jsonify({
+  #     'success': True,
+  #     'questions': questions,
+  #     'total_questions': len(questions),
+  #   })
 
   '''
   @TODO: 
@@ -188,6 +215,31 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not. 
   '''
+  @app.route('/quizzes', methods=['POST'])
+  def play_quiz():
+    body = request.get_json()
+    quiz_category = body.get('quiz_category')
+    previous_questions = body.get('previous_questions')
+
+    # Exclude all the previous questions from the list of eligible questions
+    questions = Question.query.filter(~Question.id.in_(previous_questions))
+
+    # When a category is selected
+    if quiz_category['id'] > 0:
+      # Get the list of the questions of the given category
+      questions = questions.filter(Question.category==quiz_category['id'])
+
+    question = None
+
+    # Randomly select the current question
+    if len(questions.all()) > 0:
+      question = random.choice(questions.all()).format()
+
+
+    return jsonify({
+      'success': True,
+      'question': question
+    })
 
   '''
   @TODO: 
@@ -201,6 +253,14 @@ def create_app(test_config=None):
       'error': 404,
       'message': "resource not found"
     }), 404
+
+  @app.errorhandler(422)
+  def unprocessable(error):
+    return jsonify({
+      'success': False,
+      'error': 422,
+      'message': "unprocessable"
+    }), 422
   
   return app
 
