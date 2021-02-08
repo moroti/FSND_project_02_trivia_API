@@ -85,11 +85,11 @@ def create_app(test_config=None):
         # Retreive the user inputs for the new question
         question_text = body.get('question').strip()
         answer_text = body.get('answer').strip()
-        category = body.get('category')
+        category = body.get('category').strip()
         difficulty = body.get('difficulty')
-        print("category",category)
+        
         # Valid question must have no empty fields and have valid values
-        valid_question  = question_text and answer_text and category and category <= 6 and difficulty and difficulty <= 5
+        valid_question  = question_text and answer_text and category and int(category) <= 6 and difficulty and difficulty <= 5
 
         if valid_question:
           question = Question(question_text, answer_text,category, difficulty)
